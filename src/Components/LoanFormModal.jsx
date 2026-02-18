@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useApplications } from "../context/ApplicationsContext";
 
 const initialFormState = {
   name: "",
@@ -6,12 +7,14 @@ const initialFormState = {
   email: "",
   amount: "",
   city: "",
+  profession: "",
   message: "",
 };
 
 function LoanFormModal({ isOpen, onClose, loanType }) {
   const [formData, setFormData] = useState(initialFormState);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const { addApplication } = useApplications();
 
   if (!isOpen) {
     return null;
@@ -27,7 +30,9 @@ function LoanFormModal({ isOpen, onClose, loanType }) {
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    addApplication({ ...formData, loanType });
     setIsSubmitted(true);
+    setFormData(initialFormState);
   };
 
   return (
@@ -158,6 +163,32 @@ function LoanFormModal({ isOpen, onClose, loanType }) {
                 placeholder="City"
                 required
               />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium text-slate-700" htmlFor="profession">
+                Profession Type
+              </label>
+              <select
+                id="profession"
+                name="profession"
+                value={formData.profession}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 focus:border-teal-500 focus:outline-none"
+                required
+              >
+                <option value="">Select profession</option>
+                <option value="salaried">Salaried</option>
+                <option value="self-employed">Self Employed</option>
+                <option value="business-owner">Business Owner</option>
+                <option value="professional">Professional</option>
+                <option value="student">Student</option>
+                <option value="retired">Retired</option>
+                <option value="homemaker">Homemaker</option>
+                <option value="other">Other</option>
+              </select>
             </div>
           </div>
 

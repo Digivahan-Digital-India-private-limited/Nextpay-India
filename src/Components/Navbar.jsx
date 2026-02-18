@@ -33,10 +33,16 @@ function Navbar() {
           </Link>
         </ul>
 
-        {/* Apply Button */}
-        <div className="hidden md:block">
+        {/* Apply Button + Admin Login */}
+        <div className="hidden md:flex items-center gap-3">
+          <Link
+            to="/admin"
+            className="rounded-full border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+          >
+            Admin Login
+          </Link>
           <a
-            href="https://wa.me/918279861949?text=Hi%20Team,%0A%0AI%20would%20like%20to%20connect%20with%20your%20expert%20team%20to%20discuss%20my%20loan%20requirements%20and%20understand%20the%20best%20available%20options.%20I%20request%20you%20to%20please%20guide%20me%20with%20personalized%20assistance%20and%20complete%20details.%0A%0AThank%20you.%20I%20look%20forward%20to%20speaking%20with%20your%20expert%20team"
+            href={`https://wa.me/919999838802?text=${encodeURIComponent("Hi Team,\n\nI would like to connect with your expert team to discuss my loan requirements and understand the best available options. I request you to please guide me with personalized assistance and complete details.\n\nThank you. I look forward to speaking with your expert team soon.")}`}
             className="bg-linear-to-r from-blue-600 to-teal-500 text-white px-6 py-2 rounded-full font-medium hover:opacity-90 transition"
           >
             Talk To Expert
