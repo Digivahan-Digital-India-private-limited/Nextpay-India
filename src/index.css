@@ -29,3 +29,64 @@
 .animate-team-slider {
   animation: teamSlider 25s linear infinite;
 }
+
+/* ── Modal backdrop ── */
+@keyframes modalBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.modal-backdrop {
+  animation: modalBackdropIn 0.25s ease-out;
+  backdrop-filter: blur(4px);
+}
+
+/* ── Modal card entrance ── */
+@keyframes modalEnter {
+  from { opacity: 0; transform: translateY(28px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+.modal-enter {
+  animation: modalEnter 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* ── City / profession dropdown ── */
+@keyframes dropdownEnter {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+.dropdown-enter {
+  animation: dropdownEnter 0.2s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* ── Form field stagger ── */
+@keyframes fieldIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.form-field-item {
+  animation: fieldIn 0.4s ease-out both;
+}
+.form-field-item:nth-child(1) { animation-delay: 0.06s; }
+.form-field-item:nth-child(2) { animation-delay: 0.12s; }
+.form-field-item:nth-child(3) { animation-delay: 0.18s; }
+.form-field-item:nth-child(4) { animation-delay: 0.24s; }
+.form-field-item:nth-child(5) { animation-delay: 0.30s; }
+.form-field-item:nth-child(6) { animation-delay: 0.36s; }
+
+/* ── Success screen ── */
+@keyframes successFadeIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+.success-enter {
+  animation: successFadeIn 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes checkBounce {
+  0%   { transform: scale(0) rotate(-10deg); }
+  60%  { transform: scale(1.25) rotate(4deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.success-icon {
+  animation: checkBounce 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) 0.15s both;
+}

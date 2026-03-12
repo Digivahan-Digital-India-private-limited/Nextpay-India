@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import {
@@ -12,15 +12,29 @@ import {
   Plane,
   LayoutDashboard,
 } from "lucide-react";
-import { useApplications } from "../../context/ApplicationsContext";
 import Companylogo from "../../assets/Image/nextpay.png";
 
+const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL ?? '');
+
+// Maps API enum values to display names used in LOAN_TYPES
+const LOAN_TYPE_MAP = {
+  PERSONAL_LOAN: "Personal Loan",
+  BUSINESS_LOAN: "Business Loan",
+  CAR_LOAN: "Car Loan",
+  EDUCATION_LOAN: "Education Loan",
+  HOME_LOAN: "Home Loan",
+  TWO_WHEELER_LOAN: "Two-Wheeler Loan",
+  MEDICAL_LOAN: "Medical Loan",
+  TRAVEL_LOAN: "Travel Loan",
+  INSTANT_LOAN: "Instant Loan",
+};
+
 const COLUMNS = [
-  { key: "submittedAt", label: "Submitted At" },
-  { key: "loanType", label: "Loan Type" },
-  { key: "amount", label: "Loan Amount" },
+  { key: "applied_time", label: "Submitted At" },
+  { key: "loan_type_display", label: "Loan Type" },
+  { key: "loan_amount", label: "Loan Amount" },
   { key: "name", label: "Full Name" },
-  { key: "phone", label: "Phone Number" },
+  { key: "number", label: "Phone Number" },
   { key: "email", label: "Email" },
   { key: "city", label: "City" },
   { key: "profession", label: "Profession Type" },
@@ -38,10 +52,21 @@ const LOAN_TYPES = [
   { name: "Travel Loan", icon: Plane, color: "text-emerald-600" },
 ];
 
+const DEFAULT_STATS = {
+  total_unprocessed_applications: 0,
+  total_batches_processed: 0,
+  loan_type_counts: Object.fromEntries(LOAN_TYPES.map((lt) => [lt.name, 0])),
+};
+
 function AdminDashboard() {
-  const { applications, removeApplications } = useApplications();
   const navigate = useNavigate();
-  const [activeFilter, setActiveFilter] = React.useState(null);
+  const [activeFilter, setActiveFilter] = useState(null);
+  const [stats, setStats] = useState(DEFAULT_STATS);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [apiApplications, setApiApplications] = useState([]);
+  const [isLoadingApps, setIsLoadingApps] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [apiError, setApiError] = useState(null);
 
   useEffect(() => {
     if (sessionStorage.getItem("isAdminLoggedIn") !== "true") {
@@ -49,26 +74,79 @@ function AdminDashboard() {
     }
   }, [navigate]);
 
-  const loanCounts = useMemo(() => {
-    const counts = {};
-    LOAN_TYPES.forEach((lt) => (counts[lt.name] = 0));
-    applications.forEach((app) => {
-      if (counts[app.loanType] !== undefined) counts[app.loanType]++;
-    });
-    return counts;
-  }, [applications]);
+  useEffect(() => {
+    async function fetchDashboardStats() {
+      try {
+        const res = await fetch(`${API_BASE}/api/get_dashboard_details.php`);
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        if (data.status) {
+          setStats({
+            total_unprocessed_applications: data.total_unprocessed_applications ?? 0,
+            total_batches_processed: data.total_batches_processed ?? 0,
+            loan_type_counts: data.loan_type_counts ?? DEFAULT_STATS.loan_type_counts,
+          });
+        }
+      } catch (err) {
+        setApiError(`Stats API: ${err.message}`);
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+    fetchDashboardStats();
+  }, []);
+
+  useEffect(() => {
+    async function fetchUnprocessedApps() {
+      try {
+        const res = await fetch(`${API_BASE}/api/get_unprocessed_applications.php`);
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        if (data.status) {
+          const normalized = (data.data ?? []).map((app) => ({
+            ...app,
+            loan_type_display: LOAN_TYPE_MAP[app.loan_type] ?? app.loan_type,
+          }));
+          setApiApplications(normalized);
+        }
+      } catch (err) {
+        setApiError(`Applications API: ${err.message}`);
+      } finally {
+        setIsLoadingApps(false);
+      }
+    }
+    fetchUnprocessedApps();
+  }, []);
 
   const filteredApplications = activeFilter
-    ? applications.filter((app) => app.loanType === activeFilter)
-    : applications;
+    ? apiApplications.filter((app) => app.loan_type_display === activeFilter)
+    : apiApplications;
 
   const handleLogout = () => {
     sessionStorage.removeItem("isAdminLoggedIn");
     navigate("/admin");
   };
 
-  const handleDownloadExcel = () => {
-    if (filteredApplications.length === 0) return;
+  const handleDownloadExcel = async () => {
+    if (filteredApplications.length === 0 || isDownloading) return;
+
+    const ids = filteredApplications.map((app) => app.id);
+    setIsDownloading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/Clear_application.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
+      if (!data.status) throw new Error(data.message ?? "Batch creation failed");
+    } catch (err) {
+      alert(`Could not process batch: ${err.message}`);
+      setIsDownloading(false);
+      return;
+    }
 
     const rows = filteredApplications.map((app) =>
       COLUMNS.reduce((obj, col) => {
@@ -89,9 +167,10 @@ function AdminDashboard() {
 
     XLSX.writeFile(workbook, "loan_applications.xlsx");
 
-    // Remove downloaded applications from the dashboard
-    const downloadedIds = filteredApplications.map((app) => app.id);
-    removeApplications(downloadedIds);
+    // Remove processed applications from local state
+    const downloadedIds = new Set(ids);
+    setApiApplications((prev) => prev.filter((app) => !downloadedIds.has(app.id)));
+    setIsDownloading(false);
   };
 
   return (
@@ -127,7 +206,9 @@ function AdminDashboard() {
                 Total Applications
               </p>
             </div>
-            <p className="text-4xl font-bold text-slate-800 mt-1">{applications.length}</p>
+            <p className="text-4xl font-bold text-slate-800 mt-1">
+              {statsLoading ? "—" : stats.total_unprocessed_applications}
+            </p>
           </button>
 
           {/* Individual Loan Type Cards */}
@@ -145,11 +226,20 @@ function AdminDashboard() {
                     {lt.name}
                   </p>
                 </div>
-                <p className="text-4xl font-bold text-slate-800 mt-1">{loanCounts[lt.name]}</p>
+                <p className="text-4xl font-bold text-slate-800 mt-1">
+                  {statsLoading ? "—" : (stats.loan_type_counts?.[lt.name] ?? 0)}
+                </p>
               </button>
             );
           })}
         </div>
+
+        {/* API Error Banner */}
+        {apiError && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <strong>API Error:</strong> {apiError}
+          </div>
+        )}
 
         {/* Table Header */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -159,7 +249,7 @@ function AdminDashboard() {
             </h2>
             <button
               onClick={handleDownloadExcel}
-              disabled={filteredApplications.length === 0}
+              disabled={filteredApplications.length === 0 || isDownloading}
               className="flex items-center gap-2 rounded-full bg-teal-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <svg
@@ -176,11 +266,15 @@ function AdminDashboard() {
                   d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"
                 />
               </svg>
-              Download Excel
+              {isDownloading ? "Processing..." : "Download Excel"}
             </button>
           </div>
 
-          {filteredApplications.length === 0 ? (
+          {isLoadingApps ? (
+            <div className="flex items-center justify-center py-20 text-slate-400">
+              <p className="text-sm">Loading applications...</p>
+            </div>
+          ) : filteredApplications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -199,7 +293,7 @@ function AdminDashboard() {
               <p className="text-sm font-medium">No applications yet.</p>
               <p className="text-xs mt-1">Submitted loan forms will appear here.</p>
             </div>
-          ) : (
+          ) : isLoadingApps ? null : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider">
